@@ -1,0 +1,32 @@
+spark.stop()
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{SQLContext, SparkSession}
+val spark = SparkSession.builder().appName("Spark SQL basic example").config("spark.some.config.option", "some-value").getOrCreate()
+val spark2 = SparkSession.builder().appName("Spa").config("spark.some.config.option", "some-val").getOrCreate()
+import spark.implicits._
+
+val vertices=spark2.read.json("C:/Users/AAKASH/Desktop/vertices.json")
+//val vertices=spark2.read.csv("C:/Users/AAKASH/Desktop/vertices.csv")
+
+vertices.printSchema()
+//val edges=spark.read.json("C:/Users/AAKASH/Desktop/edges.json")
+val edges = spark.read.option("multiline", "true").json("C:/Users/AAKASH/Desktop/edges.json")
+edges.printSchema()
+import org.apache.spark.graphx._
+import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.functions.col
+val vert: RDD[(VertexId, String)] = vertices.select(col("ID_Vertex").cast("long"), col("Vertex")).rdd.map(row => (row.getLong(0), row.getString(1)))
+vert.take(1)
+val ed:RDD[Edge[Long]] = edges.select(col("Source").cast("long"),col("Destination").cast("long")).rdd.map(row => Edge(row.getLong(0), row.getLong(1),1))
+ed.take(1)
+val defaultValue=("Nowhere")
+val NodeGraph=Graph(vert,ed,defaultValue)
+NodeGraph.cache()
+val ranks = NodeGraph.pageRank(0.0001,0.2).vertices
+ranks.join(vert).sortBy(_._2._1, ascending=false).take(5).foreach(x => println(x._2._2))
+
+//In-degree
+NodeGraph.inDegrees.join(vert).sortBy(_._2._1,ascending=false).take(10).foreach(x => println(x._2._2 + " has " + x._2._1 + " in degrees."))
+
+//Out-degree
+NodeGraph.outDegrees.join(vert).sortBy(_._2._1,ascending=false).take(10).foreach(x => println(x._2._2 + " has " + x._2._1 + " in degrees."))
